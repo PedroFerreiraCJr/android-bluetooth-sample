@@ -15,6 +15,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ChangedPackages;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,6 +28,8 @@ import android.widget.TextView;
 import com.google.android.material.snackbar.Snackbar;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +47,9 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int STATE_CONNECTING = 0;
     private static final int STATE_CONNECTED = 1;
-    private static final int STATE_CONNECTION_FAILED = 2;
+    private static final int STATE_READ = 2;
+    private static final int STATE_WRITE = 3;
+    private static final int STATE_CONNECTION_FAILED = 4;
 
     private static final String BLUETOOTH_APP_NAME = "Bluetooth Chat";
     private static final UUID BLUETOOTH_APP_UUID = UUID.fromString(BLUETOOTH_APP_NAME);
@@ -396,6 +401,11 @@ public class MainActivity extends AppCompatActivity {
                     message = Message.obtain();
                     message.what = STATE_CONNECTED;
                     handler.sendMessage(message);
+
+                    if (bs.isConnected()) {
+                        new BluetoothChat(bs, handler).start();
+                    }
+
                     break;
                 }
             }
@@ -436,8 +446,69 @@ public class MainActivity extends AppCompatActivity {
             if (adapter.isDiscovering()) {
                 adapter.cancelDiscovery();
             }
+
+            if (bs.isConnected()) {
+                new BluetoothChat(bs, handler).start();
+            }
         }
     }
 
+    private static class BluetoothChat extends Thread {
 
+        private final BluetoothSocket bs;
+        private final Handler handler;
+        private final InputStream is;
+        private final OutputStream os;
+
+        public BluetoothChat(BluetoothSocket socket, Handler handler) {
+            super();
+            this.bs = socket;
+            this.handler = handler;
+
+            InputStream is = null;
+            OutputStream os = null;
+            try {
+                is = socket.getInputStream();
+                os = socket.getOutputStream();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            this.is = is;
+            this.os = os;
+        }
+
+        @Override
+        public void run() {
+            byte[] buffer = new byte[1024];
+            int bytes;
+
+            while (true) {
+                try {
+                    bytes = is.read(buffer);
+                    handler.obtainMessage(STATE_READ, bytes, -1, buffer).sendToTarget();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    break;
+                }
+            }
+        }
+
+        public void write(byte[] buffer) {
+            try {
+                os.write(buffer);
+                handler.obtainMessage(STATE_WRITE, -1, -1, buffer).sendToTarget();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void cancel() {
+            try {
+                bs.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
