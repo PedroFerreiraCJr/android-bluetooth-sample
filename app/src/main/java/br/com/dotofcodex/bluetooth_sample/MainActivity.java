@@ -402,6 +402,42 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    
+    private static class BluetoothClient extends Thread {
+
+        private final BluetoothAdapter adapter;
+        private final BluetoothSocket bs;
+        private final Handler handler;
+
+        public BluetoothClient(BluetoothAdapter adapter, BluetoothDevice device, Handler handler) throws IOException {
+            super();
+            this.adapter = adapter;
+            this.handler = handler;
+            this.bs = device.createRfcommSocketToServiceRecord(BLUETOOTH_APP_UUID);
+        }
+
+        @Override
+        public void run() {
+            Message message = null;
+
+            try {
+                bs.connect();
+
+                message = Message.obtain();
+                message.what = STATE_CONNECTED;
+                handler.sendMessage(message);
+            } catch (IOException e) {
+                e.printStackTrace();
+
+                message = Message.obtain();
+                message.what = STATE_CONNECTION_FAILED;
+                handler.sendMessage(message);
+            }
+
+            if (adapter.isDiscovering()) {
+                adapter.cancelDiscovery();
+            }
+        }
+    }
+
 
 }
