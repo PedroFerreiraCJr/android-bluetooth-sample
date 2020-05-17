@@ -19,7 +19,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
@@ -58,8 +57,10 @@ public class MainActivity extends AppCompatActivity {
     protected Button discoverability;
 
     private BluetoothAdapter adapter;
-    private IntentFilter filter;
-    private BroadcastReceiver receiver;
+    private IntentFilter filterActionFound;
+    private IntentFilter filterState;
+    private BroadcastReceiver receiverAction;
+    private BroadcastReceiver receiverState;
     private List<BluetoothDevice> bts;
 
     @Override
@@ -105,8 +106,8 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-        receiver = new BroadcastReceiver() {
+        filterActionFound = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        receiverAction = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if (BluetoothDevice.ACTION_FOUND.equals(intent.getAction())) {
@@ -123,29 +124,78 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
-    }
+        filterState = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        receiverState = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(intent.getAction())) {
+                    int type = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+                    String message = null;
+                    switch (type) {
+                        case BluetoothAdapter.STATE_TURNING_ON: {
+                            message = "Bluetooth turning on";
+                            break;
+                        }
+                        case BluetoothAdapter.STATE_ON: {
+                            message = "Bluetooth On";
+                            break;
+                        }
+                        case BluetoothAdapter.STATE_TURNING_OFF: {
+                            message = "Bluetooth turning off";
+                            break;
+                        }
+                        case BluetoothAdapter.STATE_OFF: {
+                            message = "Bluetooth Off";
+                            break;
+                        }
+                        case BluetoothAdapter.STATE_CONNECTED: {
+                            message = "Connected";
+                            break;
+                        }
+                        case BluetoothAdapter.STATE_CONNECTING: {
+                            message = "Connecting";
+                            break;
+                        }
+                        case BluetoothAdapter.STATE_DISCONNECTED: {
+                            message = "Disconnected";
+                            break;
+                        }
+                        case BluetoothAdapter.STATE_DISCONNECTING: {
+                            message = "Disconnecting";
+                            break;
+                        }
+                        default: {
+                            message = "None State";
+                        }
+                    }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
+                    Log.i(TAG, message);
+                }
+            }
+        };
 
         if (bts == null) {
             bts = new ArrayList<>();
         }
 
-        registerReceiver(receiver, filter);
+        registerReceiver(receiverAction, filterActionFound);
+        registerReceiver(receiverState, filterState);
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
+    protected void onDestroy() {
+        super.onDestroy();
 
         if (bts != null && !bts.isEmpty()) {
             bts.clear();
         }
 
         try {
-            unregisterReceiver(receiver);
+            unregisterReceiver(receiverAction);
+        } catch (IllegalArgumentException e) {  }
+
+        try {
+            unregisterReceiver(receiverState);
         } catch (IllegalArgumentException e) {  }
     }
 
