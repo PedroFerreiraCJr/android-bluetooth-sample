@@ -222,27 +222,7 @@ public class MainActivity extends AppCompatActivity {
             bts = new ArrayList<>();
         }
 
-        handler = new Handler(new Handler.Callback() {
-            @Override
-            public boolean handleMessage(@NonNull Message message) {
-                switch (message.what) {
-                    case STATE_CONNECTING: {
-                        // update ui
-                        break;
-                    }
-                    case STATE_CONNECTED: {
-                        // update ui
-                        break;
-                    }
-                    case STATE_CONNECTION_FAILED: {
-                        // update ui
-                        break;
-                    }
-                }
-
-                return true;
-            }
-        });
+        handler = new Handler(new SimpleHandler());
 
         registerReceiver(receiverAction, filterAction);
         registerReceiver(receiverState, filterState);
@@ -350,6 +330,29 @@ public class MainActivity extends AppCompatActivity {
                 this.devices.setText(this.devices.getText().toString().concat("\n").concat(device));
             }
             i++;
+        }
+    }
+
+    private static class SimpleHandler implements Handler.Callback {
+
+        @Override
+        public boolean handleMessage(@NonNull Message message) {
+            switch (message.what) {
+                case STATE_CONNECTING: {
+                    // update ui
+                    break;
+                }
+                case STATE_CONNECTED: {
+                    // update ui
+                    break;
+                }
+                case STATE_CONNECTION_FAILED: {
+                    // update ui
+                    break;
+                }
+            }
+
+            return true;
         }
     }
 
