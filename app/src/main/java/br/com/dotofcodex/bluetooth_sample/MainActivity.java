@@ -5,8 +5,12 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -14,6 +18,8 @@ import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import butterknife.BindView;
@@ -22,6 +28,7 @@ import butterknife.ButterKnife;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
+
     private static final int REQUEST_BLUETOOTH = 1;
     private static final String BLUETOOTH_ON = "Bluetooth Enabled";
     private static final String BLUETOOTH_OFF = "Bluetooth Disabled";
@@ -39,6 +46,9 @@ public class MainActivity extends AppCompatActivity {
     protected TextView devices;
 
     private BluetoothAdapter adapter;
+    private IntentFilter filter;
+    private BroadcastReceiver receiver;
+    private List<BluetoothDevice> bts;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +80,48 @@ public class MainActivity extends AppCompatActivity {
                 status.setText(BLUETOOTH_OFF);
             }
         });
+
+        filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (BluetoothDevice.ACTION_FOUND.equals(intent.getAction())) {
+                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                    if (!bts.contains(device)) {
+                        bts.add(device);
+                    }
+
+                    for (BluetoothDevice dev : bts) {
+                        Log.i(TAG, String.format("%s, %s", dev.getName(), dev.getAddress()));
+                    }
+                }
+            }
+        };
+
+        adapter.startDiscovery();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        if (bts == null) {
+            bts = new ArrayList<>();
+        }
+
+        registerReceiver(receiver, filter);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        if (bts != null && !bts.isEmpty()) {
+            bts.clear();
+        }
+
+        unregisterReceiver(receiver);
     }
 
     @Override
