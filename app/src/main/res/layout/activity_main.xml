@@ -46,4 +46,16 @@
         android:textSize="30sp"
         android:text="Bluetooth Status"
         app:layout_constraintTop_toBottomOf="@id/ll"/>
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/tv_devices"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:textAllCaps="false"
+        android:textAlignment="center"
+        android:textColor="@android:color/black"
+        android:textSize="30sp"
+        android:text="Bluetooth Devices"
+        app:layout_constraintBottom_toBottomOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>
