@@ -9,12 +9,16 @@ import androidx.core.content.ContextCompat;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -22,9 +26,11 @@ import android.widget.TextView;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -35,6 +41,14 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_BLUETOOTH = 1;
     private static final int REQUEST_BLUETOOTH_PERMISSION = 2;
+
+    private static final int STATE_CONNECTING = 0;
+    private static final int STATE_CONNECTED = 1;
+    private static final int STATE_CONNECTION_FAILED = 2;
+
+    private static final String BLUETOOTH_APP_NAME = "Bluetooth Chat";
+    private static final UUID BLUETOOTH_APP_UUID = UUID.fromString(BLUETOOTH_APP_NAME);
+
     private static final String BLUETOOTH_ON = "Bluetooth Enabled";
     private static final String BLUETOOTH_OFF = "Bluetooth Disabled";
 
@@ -57,13 +71,11 @@ public class MainActivity extends AppCompatActivity {
     protected Button discoverability;
 
     private BluetoothAdapter adapter;
-    private IntentFilter filterAction;
-    private IntentFilter filterState;
-    private IntentFilter filterScan;
     private BroadcastReceiver receiverAction;
     private BroadcastReceiver receiverState;
     private BroadcastReceiver receiverScan;
     private List<BluetoothDevice> bts;
+    private Handler handler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,7 +120,7 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        filterAction = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        IntentFilter filterAction = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         receiverAction = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -126,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
-        filterState = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        IntentFilter filterState = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
         receiverState = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -176,7 +188,7 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
-        filterScan = new IntentFilter(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
+        IntentFilter filterScan = new IntentFilter(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
         receiverScan = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -209,6 +221,28 @@ public class MainActivity extends AppCompatActivity {
         if (bts == null) {
             bts = new ArrayList<>();
         }
+
+        handler = new Handler(new Handler.Callback() {
+            @Override
+            public boolean handleMessage(@NonNull Message message) {
+                switch (message.what) {
+                    case STATE_CONNECTING: {
+                        // update ui
+                        break;
+                    }
+                    case STATE_CONNECTED: {
+                        // update ui
+                        break;
+                    }
+                    case STATE_CONNECTION_FAILED: {
+                        // update ui
+                        break;
+                    }
+                }
+
+                return true;
+            }
+        });
 
         registerReceiver(receiverAction, filterAction);
         registerReceiver(receiverState, filterState);
@@ -318,4 +352,51 @@ public class MainActivity extends AppCompatActivity {
             i++;
         }
     }
+
+    private static class BluetoothServer extends Thread {
+
+        private final BluetoothAdapter adapter;
+        private final Handler handler;
+        private final BluetoothServerSocket bss;
+
+        public BluetoothServer(BluetoothAdapter adapter, Handler handler) throws IOException {
+            super();
+            this.adapter = adapter;
+            this.handler = handler;
+            this.bss = adapter.listenUsingRfcommWithServiceRecord(BLUETOOTH_APP_NAME, BLUETOOTH_APP_UUID);
+        }
+
+        @Override
+        public void run() {
+            BluetoothSocket bs = null;
+
+            while (bs == null) {
+                Message message = Message.obtain();
+                message.what = STATE_CONNECTING;
+                handler.sendMessage(message);
+
+                try {
+                    bs = bss.accept();
+                } catch (IOException e) {
+                    e.printStackTrace();
+
+                    message = Message.obtain();
+                    message.what = STATE_CONNECTION_FAILED;
+                    handler.sendMessage(message);
+                }
+
+                if (adapter.isDiscovering()) {
+                    adapter.cancelDiscovery();
+                }
+
+                if (bs != null) {
+                    message = Message.obtain();
+                    message.what = STATE_CONNECTED;
+                    handler.sendMessage(message);
+                    break;
+                }
+            }
+        }
+    }
+    
 }
