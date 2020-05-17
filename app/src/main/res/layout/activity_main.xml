@@ -35,6 +35,30 @@
             android:layout_weight="1"/>
     </androidx.appcompat.widget.LinearLayoutCompat>
 
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/bt_discover"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:text="Discover"
+        android:textAllCaps="false"
+        android:textColor="@android:color/black"
+        app:layout_constraintEnd_toStartOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ll" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/bt_discoverability"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:text="Discoverability"
+        android:textAllCaps="false"
+        android:textColor="@android:color/black"
+        app:layout_constraintEnd_toStartOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/bt_discover" />
+
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tv_status"
         android:layout_width="match_parent"
@@ -45,7 +69,7 @@
         android:textColor="@android:color/black"
         android:textSize="30sp"
         android:text="Bluetooth Status"
-        app:layout_constraintTop_toBottomOf="@id/ll"/>
+        app:layout_constraintTop_toBottomOf="@id/bt_discoverability"/>
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tv_devices"

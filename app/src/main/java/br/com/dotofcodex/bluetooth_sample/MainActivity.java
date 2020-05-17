@@ -1,14 +1,19 @@
 package br.com.dotofcodex.bluetooth_sample;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -30,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
     private static final int REQUEST_BLUETOOTH = 1;
+    private static final int REQUEST_BLUETOOTH_PERMISSION = 2;
     private static final String BLUETOOTH_ON = "Bluetooth Enabled";
     private static final String BLUETOOTH_OFF = "Bluetooth Disabled";
 
@@ -44,6 +50,12 @@ public class MainActivity extends AppCompatActivity {
 
     @BindView(R.id.tv_devices)
     protected TextView devices;
+
+    @BindView(R.id.bt_discover)
+    protected Button discover;
+
+    @BindView(R.id.bt_discoverability)
+    protected Button discoverability;
 
     private BluetoothAdapter adapter;
     private IntentFilter filter;
@@ -81,6 +93,18 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        discover.setOnClickListener((View v) -> {
+            requestBluetoothAdditionalPermission();
+            startDiscover();
+        });
+
+        discoverability.setOnClickListener((View v) -> {
+            Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+            int seconds = 60 * 2;
+            intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, seconds);
+            startActivity(intent);
+        });
+
         filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         receiver = new BroadcastReceiver() {
             @Override
@@ -99,7 +123,6 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
-        adapter.startDiscovery();
     }
 
     @Override
@@ -121,7 +144,23 @@ public class MainActivity extends AppCompatActivity {
             bts.clear();
         }
 
-        unregisterReceiver(receiver);
+        try {
+            unregisterReceiver(receiver);
+        } catch (IllegalArgumentException e) {  }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_BLUETOOTH_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Snackbar.make(getWindow().getDecorView(), "Bluetooth Additional Permission Granted", Snackbar.LENGTH_SHORT);
+            }
+            else {
+                Snackbar.make(getWindow().getDecorView(), "Bluetooth Additional Permission Denied", Snackbar.LENGTH_SHORT);
+            }
+        }
     }
 
     @Override
@@ -139,6 +178,33 @@ public class MainActivity extends AppCompatActivity {
                 status.setText(BLUETOOTH_OFF);
             }
         }
+    }
+
+    private void startDiscover() {
+        if (!adapter.isEnabled()) {
+            Snackbar.make(getWindow().getDecorView(), "Bluetooth not enabled", Snackbar.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (adapter.isDiscovering()) {
+            Log.i(TAG, "starting discovery again...");
+            adapter.cancelDiscovery();
+            adapter.startDiscovery();
+            return;
+        }
+
+        Log.i(TAG, "just starting...");
+        adapter.startDiscovery();
+    }
+
+    private void requestBluetoothAdditionalPermission() {
+        if (!isPermissionGranted()) {
+            ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.ACCESS_COARSE_LOCATION }, REQUEST_BLUETOOTH_PERMISSION);
+        }
+    }
+
+    private boolean isPermissionGranted() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void listBondDevices() {
