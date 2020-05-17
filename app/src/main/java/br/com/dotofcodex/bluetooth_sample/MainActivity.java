@@ -222,7 +222,7 @@ public class MainActivity extends AppCompatActivity {
             bts = new ArrayList<>();
         }
 
-        handler = new Handler(new SimpleHandler());
+        handler = new Handler(new HandlerCallbackImpl());
 
         registerReceiver(receiverAction, filterAction);
         registerReceiver(receiverState, filterState);
@@ -333,7 +333,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private static class SimpleHandler implements Handler.Callback {
+    private static class HandlerCallbackImpl implements Handler.Callback {
 
         @Override
         public boolean handleMessage(@NonNull Message message) {
@@ -401,5 +401,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
     
+
 }
