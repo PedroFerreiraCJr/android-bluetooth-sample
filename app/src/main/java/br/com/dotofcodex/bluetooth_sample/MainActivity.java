@@ -57,10 +57,12 @@ public class MainActivity extends AppCompatActivity {
     protected Button discoverability;
 
     private BluetoothAdapter adapter;
-    private IntentFilter filterActionFound;
+    private IntentFilter filterAction;
     private IntentFilter filterState;
+    private IntentFilter filterScan;
     private BroadcastReceiver receiverAction;
     private BroadcastReceiver receiverState;
+    private BroadcastReceiver receiverScan;
     private List<BluetoothDevice> bts;
 
     @Override
@@ -106,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        filterActionFound = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        filterAction = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         receiverAction = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -174,12 +176,43 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
+        filterScan = new IntentFilter(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
+        receiverScan = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (BluetoothAdapter.ACTION_SCAN_MODE_CHANGED.equals(intent.getAction())) {
+                    int type = intent.getIntExtra(BluetoothAdapter.EXTRA_SCAN_MODE, BluetoothAdapter.ERROR);
+                    String message = null;
+                    switch (type) {
+                        case BluetoothAdapter.SCAN_MODE_CONNECTABLE: {
+                            message = "Scan Mode connectable";
+                            break;
+                        }
+                        case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE: {
+                            message = "Scan Mode connectable discoverable";
+                            break;
+                        }
+                        case BluetoothAdapter.SCAN_MODE_NONE: {
+                            message = "Scan Mode none";
+                            break;
+                        }
+                        default: {
+                            message = "Scan Mode error";
+                        }
+                    }
+
+                    Log.i(TAG, message);
+                }
+            }
+        };
+
         if (bts == null) {
             bts = new ArrayList<>();
         }
 
-        registerReceiver(receiverAction, filterActionFound);
+        registerReceiver(receiverAction, filterAction);
         registerReceiver(receiverState, filterState);
+        registerReceiver(receiverScan, filterScan);
     }
 
     @Override
@@ -196,6 +229,10 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             unregisterReceiver(receiverState);
+        } catch (IllegalArgumentException e) {  }
+
+        try {
+            unregisterReceiver(receiverScan);
         } catch (IllegalArgumentException e) {  }
     }
 
