@@ -24,12 +24,14 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -52,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int STATE_CONNECTION_FAILED = 4;
 
     private static final String BLUETOOTH_APP_NAME = "Bluetooth Chat";
-    private static final UUID BLUETOOTH_APP_UUID = UUID.fromString(BLUETOOTH_APP_NAME);
+    private static final UUID BLUETOOTH_APP_UUID = UUID.fromString("5afc04a6-9c91-49d2-9271-ecf35d2f7158");
 
     private static final String BLUETOOTH_ON = "Bluetooth Enabled";
     private static final String BLUETOOTH_OFF = "Bluetooth Disabled";
@@ -74,6 +76,9 @@ public class MainActivity extends AppCompatActivity {
 
     @BindView(R.id.bt_discoverability)
     protected Button discoverability;
+
+    @BindView(R.id.bt_send)
+    protected Button send;
 
     private BluetoothAdapter adapter;
     private BroadcastReceiver receiverAction;
@@ -113,19 +118,35 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // start as a client
         discover.setOnClickListener((View v) -> {
             requestBluetoothAdditionalPermission();
             startDiscover();
         });
 
+        // start as a server
         discoverability.setOnClickListener((View v) -> {
+            try {
+                new BluetoothServer(adapter, handler).start();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
             int seconds = 60 * 2;
             intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, seconds);
             startActivity(intent);
         });
 
-        IntentFilter filterAction = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        send.setOnClickListener((View v) -> {
+            if (BluetoothChat.getCurrentInstance() != null) {
+                Log.i(TAG, "Message sent...");
+                BluetoothChat.getCurrentInstance().write("Pedro Ferreira de Carvalho Junior".getBytes(Charset.forName("UTF-8")));
+            }
+        });
+
+        IntentFilter filterAction = new IntentFilter();
+        filterAction.addAction(BluetoothDevice.ACTION_FOUND);
+        filterAction.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         receiverAction = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -134,11 +155,25 @@ public class MainActivity extends AppCompatActivity {
 
                     if (!bts.contains(device)) {
                         bts.add(device);
+
+                        if (device.getName() != null && device.getName().contains("Lenovo")) {
+                            try {
+                                new BluetoothClient(adapter, device, handler).start();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
                     }
 
                     for (BluetoothDevice dev : bts) {
                         Log.i(TAG, String.format("%s, %s", dev.getName(), dev.getAddress()));
                     }
+                    return;
+                }
+
+                if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(intent.getAction())) {
+                    Log.i(TAG, "Discovery finished");
+                    bts.clear();
                 }
             }
         };
@@ -227,7 +262,7 @@ public class MainActivity extends AppCompatActivity {
             bts = new ArrayList<>();
         }
 
-        handler = new Handler(new HandlerCallbackImpl());
+        handler = new Handler(new HandlerCallbackImpl(this));
 
         registerReceiver(receiverAction, filterAction);
         registerReceiver(receiverState, filterState);
@@ -339,9 +374,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static class HandlerCallbackImpl implements Handler.Callback {
+        private Context ctx;
+
+        public HandlerCallbackImpl(Context context) {
+            super();
+            this.ctx = context;
+        }
 
         @Override
         public boolean handleMessage(@NonNull Message message) {
+            Log.i(TAG, "New message");
+            Log.i(TAG, String.valueOf(message.what));
             switch (message.what) {
                 case STATE_CONNECTING: {
                     // update ui
@@ -355,6 +398,25 @@ public class MainActivity extends AppCompatActivity {
                     // update ui
                     break;
                 }
+                case STATE_READ: {
+                    // update ui
+                    byte[] bytes = (byte[])message.obj;
+                    Log.i(TAG, new String(bytes, 0, message.arg1));
+                    Toast.makeText(ctx, new String(bytes, 0, message.arg1), Toast.LENGTH_LONG).show();
+                    break;
+                }
+                case STATE_WRITE: {
+                    Toast.makeText(ctx, "Writing...", Toast.LENGTH_LONG).show();
+                    break;
+                }
+                case 1000: {
+                    Toast.makeText(ctx, "Connected as Client", Toast.LENGTH_LONG).show();
+                    break;
+                }
+                case 2000: {
+                    Toast.makeText(ctx, "Connected as Server", Toast.LENGTH_LONG).show();
+                    break;
+                }
             }
 
             return true;
@@ -366,12 +428,17 @@ public class MainActivity extends AppCompatActivity {
         private final BluetoothAdapter adapter;
         private final Handler handler;
         private final BluetoothServerSocket bss;
+        private BluetoothChat chat;
 
         public BluetoothServer(BluetoothAdapter adapter, Handler handler) throws IOException {
             super();
             this.adapter = adapter;
             this.handler = handler;
             this.bss = adapter.listenUsingRfcommWithServiceRecord(BLUETOOTH_APP_NAME, BLUETOOTH_APP_UUID);
+        }
+
+        public BluetoothChat getBluetoothChat() {
+            return this.chat;
         }
 
         @Override
@@ -402,9 +469,9 @@ public class MainActivity extends AppCompatActivity {
                     message.what = STATE_CONNECTED;
                     handler.sendMessage(message);
 
-                    if (bs.isConnected()) {
-                        new BluetoothChat(bs, handler).start();
-                    }
+                    handler.obtainMessage(2000).sendToTarget();
+                    chat = new BluetoothChat(bs, handler);
+                    chat.start();
 
                     break;
                 }
@@ -417,12 +484,17 @@ public class MainActivity extends AppCompatActivity {
         private final BluetoothAdapter adapter;
         private final BluetoothSocket bs;
         private final Handler handler;
+        private BluetoothChat chat;
 
         public BluetoothClient(BluetoothAdapter adapter, BluetoothDevice device, Handler handler) throws IOException {
             super();
             this.adapter = adapter;
             this.handler = handler;
             this.bs = device.createRfcommSocketToServiceRecord(BLUETOOTH_APP_UUID);
+        }
+
+        public BluetoothChat getBluetoothChat() {
+            return this.chat;
         }
 
         @Override
@@ -447,13 +519,16 @@ public class MainActivity extends AppCompatActivity {
                 adapter.cancelDiscovery();
             }
 
-            if (bs.isConnected()) {
-                new BluetoothChat(bs, handler).start();
-            }
+            handler.obtainMessage(1000).sendToTarget();
+
+            chat = new BluetoothChat(bs, handler);
+            chat.start();
         }
     }
 
     private static class BluetoothChat extends Thread {
+
+        private static BluetoothChat instance;
 
         private final BluetoothSocket bs;
         private final Handler handler;
@@ -476,12 +551,14 @@ public class MainActivity extends AppCompatActivity {
 
             this.is = is;
             this.os = os;
+
+            BluetoothChat.instance = this;
         }
 
         @Override
         public void run() {
             byte[] buffer = new byte[1024];
-            int bytes;
+            int bytes = 0;
 
             while (true) {
                 try {
@@ -492,6 +569,10 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 }
             }
+        }
+
+        public static BluetoothChat getCurrentInstance() {
+            return BluetoothChat.instance;
         }
 
         public void write(byte[] buffer) {
